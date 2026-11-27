@@ -1,0 +1,1776 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<title>Heart Album</title>
+<style>
+  :root{
+    --pink:#ff9ec4;
+    --pink-soft:rgba(255,158,196,.55);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{
+    width:100%;height:100%;overflow:hidden;background:#05030a;
+    -webkit-tap-highlight-color:transparent;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",Helvetica,Arial,sans-serif;
+    color:#ffe6f2;
+    user-select:none;-webkit-user-select:none;
+  }
+  #scene{position:fixed;inset:0;}
+  #scene canvas{display:block;touch-action:none;}
+
+  #topbar{
+    position:fixed;top:calc(env(safe-area-inset-top,0px) + 14px);right:14px;
+    display:flex;gap:8px;z-index:20;
+  }
+  .pill{
+    appearance:none;border:1px solid rgba(255,175,210,.28);
+    background:rgba(255,140,190,.07);
+    backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+    color:#ffd8ea;font-size:13px;letter-spacing:.04em;
+    padding:9px 15px;border-radius:999px;cursor:pointer;
+    transition:all .25s ease;
+    box-shadow:0 2px 18px rgba(255,90,160,.14), inset 0 0 14px rgba(255,160,205,.08);
+    white-space:nowrap;
+  }
+  .pill:active{transform:scale(.94);}
+  .pill:hover{border-color:rgba(255,175,210,.6);background:rgba(255,140,190,.16);}
+  .pill.icon{padding:9px 12px;font-size:14px;}
+  .pill.off{opacity:.42;}
+
+  #hint{
+    position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 22px);
+    transform:translateX(-50%);
+    font-size:12px;letter-spacing:.12em;color:rgba(255,190,220,.4);
+    pointer-events:none;z-index:15;transition:opacity .8s ease;
+    white-space:nowrap;
+  }
+  #hint.hide{opacity:0;}
+
+  #btnCreate{
+    position:fixed;left:50%;bottom:16vh;
+    transform:translate(-50%,22px) scale(.94);
+    opacity:0;pointer-events:none;
+    padding:15px 40px;border-radius:999px;
+    border:1px solid rgba(255,180,212,.45);
+    background:linear-gradient(180deg,rgba(255,160,205,.14),rgba(255,120,175,.06));
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    color:#ffe0ee;font-size:15px;letter-spacing:.3em;text-transform:lowercase;
+    cursor:pointer;z-index:22;
+    transition:opacity .7s cubic-bezier(.2,.8,.2,1), transform .7s cubic-bezier(.2,.8,.2,1), box-shadow .4s ease;
+    box-shadow:0 0 34px rgba(255,110,170,.28), 0 0 80px rgba(255,90,160,.14), inset 0 0 22px rgba(255,165,205,.12);
+  }
+  #btnCreate.show{opacity:1;transform:translate(-50%,0) scale(1);pointer-events:auto;}
+  #btnCreate:hover{box-shadow:0 0 44px rgba(255,110,170,.5), 0 0 110px rgba(255,90,160,.22), inset 0 0 26px rgba(255,165,205,.18);}
+  #btnCreate:active{transform:translate(-50%,0) scale(.95);}
+
+  #carousel{
+    position:fixed;inset:0;z-index:18;
+    overflow:hidden;
+    opacity:0;pointer-events:none;
+    transition:opacity .9s ease;
+  }
+  #carousel.on{opacity:1;}
+
+  .film-viewport{
+    position:absolute;inset:0;
+    display:flex;align-items:center;
+    overflow:hidden;
+    pointer-events:none;
+  }
+  .film-strip{
+    display:flex;align-items:center;
+    flex:0 0 auto;
+    will-change:transform;
+    transition:transform 1.05s cubic-bezier(.34,.02,.2,1);
+    padding-left:0;
+  }
+
+  .film-item{
+    flex:0 0 auto;
+    position:relative;
+    border-radius:20px;
+    padding:7px;
+    background:
+      linear-gradient(150deg, #ffd0e3 0%, #ffb0d0 42%, #f583b6 100%);
+    box-shadow:
+      0 10px 34px rgba(255,110,170,.28),
+      0 0 0 1px rgba(255,225,238,.35),
+      inset 0 0 0 1px rgba(255,255,255,.35);
+    transition:transform .7s cubic-bezier(.16,1,.3,1),
+               opacity .6s ease,
+               filter .6s ease,
+               box-shadow .6s ease;
+    transform:scale(.78);
+    opacity:.42;
+    filter:saturate(.6) brightness(.72);
+    will-change:transform,opacity;
+  }
+  .film-item img{
+    width:100%;height:100%;
+    display:block;
+    border-radius:14px;
+    object-fit:cover;
+    -webkit-user-drag:none;
+    -webkit-touch-callout:none;
+    pointer-events:none;
+  }
+  .film-item.active{
+    transform:scale(1.32);
+    opacity:1;
+    filter:none;
+    z-index:2;
+    box-shadow:
+      0 30px 90px rgba(255,100,165,.55),
+      0 0 0 2px rgba(255,235,245,.7),
+      0 0 60px rgba(255,140,190,.4),
+      inset 0 0 0 1px rgba(255,255,255,.6);
+  }
+  #carousel.on .film-item.active{pointer-events:auto;cursor:zoom-in;}
+
+  #lightbox{
+    position:fixed;inset:0;z-index:60;
+    background:rgba(4,2,9,.86);
+    backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);
+    display:flex;align-items:center;justify-content:center;
+    opacity:0;pointer-events:none;transition:opacity .4s ease;
+    padding:4vh 4vw;
+  }
+  #lightbox.on{opacity:1;pointer-events:auto;}
+  #lightbox img{
+    max-width:94vw;max-height:92vh;
+    border-radius:12px;
+    box-shadow:0 0 120px rgba(255,110,175,.4);
+    transform:scale(.92);transition:transform .45s cubic-bezier(.16,1,.3,1);
+  }
+  #lightbox.on img{transform:scale(1);}
+
+  #empty{
+    position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
+    text-align:center;z-index:16;pointer-events:none;
+    opacity:0;transition:opacity .8s ease;
+  }
+  #empty.on{opacity:1;}
+  #empty .t1{font-size:15px;letter-spacing:.22em;color:rgba(255,190,220,.72);}
+  #empty .t2{margin-top:12px;font-size:11.5px;letter-spacing:.16em;color:rgba(255,170,205,.38);}
+
+  #loading{
+    position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
+    z-index:40;font-size:12px;letter-spacing:.25em;color:rgba(255,190,220,.8);
+    opacity:0;pointer-events:none;transition:opacity .4s ease;
+  }
+  #loading.on{opacity:1;}
+
+  @media (max-width:520px){
+    .pill{font-size:12px;padding:8px 12px;}
+    #btnCreate{padding:13px 32px;font-size:14px;}
+    .film-item{border-radius:16px;padding:5px;}
+    .film-item img{border-radius:11px;}
+    .film-item.active{transform:scale(1.26);}
+  }
+</style>
+</head>
+<body>
+
+<div id="scene"></div>
+
+<div id="topbar">
+  <button class="pill" id="btnUpload">＋ 照片</button>
+  <button class="pill" id="btnClear">清空</button>
+  <button class="pill icon off" id="btnMusic">♪</button>
+</div>
+
+<div id="empty">
+  <div class="t1">还没有照片</div>
+  <div class="t2">轻触右上角 · 添加你的回忆</div>
+</div>
+
+<div id="hint">拖拽旋转 · 滚轮 / 双指缩放</div>
+
+<button id="btnCreate">create</button>
+
+<div id="carousel">
+  <div class="film-viewport">
+    <div class="film-strip" id="filmStrip"></div>
+  </div>
+</div>
+
+<div id="lightbox"><img alt="" /></div>
+<div id="loading">LOADING</div>
+
+<input type="file" id="fileInput" accept="image/*" multiple hidden />
+
+<audio id="bgm" loop preload="auto" src="./music.mp3"></audio>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+/* =========================================================
+   0. 工具
+   ========================================================= */
+const clamp = (v,a,b)=> v<a?a:(v>b?b:v);
+const lerp  = (a,b,t)=> a+(b-a)*t;
+const rand  = (a,b)=> a+Math.random()*(b-a);
+const easeOutCubic  = t=> 1-Math.pow(1-t,3);
+const easeInCubic   = t=> t*t*t;
+const easeInOutCubic= t=> t<0.5 ? 4*t*t*t : 1-Math.pow(-2*t+2,3)/2;
+const easeOutQuint  = t=> 1-Math.pow(1-t,5);
+const V3 = THREE.Vector3;
+const TAU = Math.PI*2;
+
+const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+const DPR_CAP  = 2;
+
+/* =========================================================
+   1. 渲染器 / 场景 / 相机
+   ========================================================= */
+const host = document.getElementById('scene');
+const renderer = new THREE.WebGLRenderer({
+  antialias:true,
+  powerPreference:'high-performance',
+  alpha:false,
+  stencil:false,
+});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, DPR_CAP));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setClearColor(0x05030a, 1);
+host.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x07040f, 0.012);
+
+const camera = new THREE.PerspectiveCamera(52, window.innerWidth/window.innerHeight, 0.1, 500);
+
+const cam = {
+  theta:0, phi:1.32, radius:7.4,
+  tTheta:0, tPhi:1.32, tRadius:7.4
+};
+function fitRadius(){
+  const a = window.innerWidth/window.innerHeight;
+  return a < 0.72 ? 7.6 : (a < 1.2 ? 7.0 : 6.5);
+}
+cam.radius = cam.tRadius = fitRadius();
+
+/* =========================================================
+   2. 纹理工厂
+   ========================================================= */
+function makeRadialTexture(size, stops){
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(size/2,size/2,0, size/2,size/2,size/2);
+  for(const s of stops) g.addColorStop(s[0], s[1]);
+  ctx.fillStyle = g;
+  ctx.fillRect(0,0,size,size);
+  const t = new THREE.CanvasTexture(c);
+  t.needsUpdate = true;
+  return t;
+}
+
+const glowTex = makeRadialTexture(256, [
+  [0,   'rgba(255,255,255,1)'],
+  [0.18,'rgba(255,210,232,0.85)'],
+  [0.42,'rgba(255,150,200,0.35)'],
+  [0.75,'rgba(255,110,175,0.07)'],
+  [1,   'rgba(255,110,175,0)']
+]);
+
+function makeHeartTexture(){
+  const S = 160;
+  const c = document.createElement('canvas');
+  c.width = c.height = S;
+  const ctx = c.getContext('2d');
+  ctx.translate(S/2, S/2);
+
+  const K = S * 0.0245;
+  const path = new Path2D();
+  for(let i=0;i<=96;i++){
+    const t = i/96*TAU;
+    const x = 16*Math.pow(Math.sin(t),3);
+    const y = 13*Math.cos(t) - 5*Math.cos(2*t) - 2*Math.cos(3*t) - Math.cos(4*t);
+    const px =  x*K;
+    const py = -(y+2.55)*K;
+    if(i===0) path.moveTo(px,py); else path.lineTo(px,py);
+  }
+  path.closePath();
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(255,120,180,0.95)';
+  ctx.shadowBlur  = 22;
+  const grd = ctx.createRadialGradient(0,-S*0.06,0, 0,0,S*0.46);
+  grd.addColorStop(0,'#ffe1ef');
+  grd.addColorStop(0.45,'#ff9dc8');
+  grd.addColorStop(1,'#f46ba6');
+  ctx.fillStyle = grd;
+  ctx.fill(path);
+  ctx.restore();
+
+  const t = new THREE.CanvasTexture(c);
+  t.needsUpdate = true;
+  return t;
+}
+const heartTex = makeHeartTexture();
+
+/* =========================================================
+   3. 星空 & 星云
+   ========================================================= */
+const starUniforms = { uTime:{value:0}, uPixelRatio:{value:renderer.getPixelRatio()} };
+
+(function createStars(){
+  const N = 2200;
+  const pos   = new Float32Array(N*3);
+  const col   = new Float32Array(N*3);
+  const size  = new Float32Array(N);
+  const phase = new Float32Array(N);
+  const tmp = new THREE.Color();
+
+  for(let i=0;i<N;i++){
+    const r  = 60 + Math.random()*120;
+    const th = Math.random()*TAU;
+    const ph = Math.acos(2*Math.random()-1);
+    pos[i*3]   = r*Math.sin(ph)*Math.cos(th);
+    pos[i*3+1] = r*Math.cos(ph);
+    pos[i*3+2] = r*Math.sin(ph)*Math.sin(th);
+
+    const k = Math.random();
+    if(k < 0.58)      tmp.setHSL(0.60+Math.random()*0.08, 0.30, 0.80+Math.random()*0.18);
+    else if(k < 0.86) tmp.setHSL(0.93+Math.random()*0.06, 0.55, 0.80+Math.random()*0.15);
+    else              tmp.setHSL(0.09+Math.random()*0.05, 0.55, 0.78+Math.random()*0.15);
+
+    col[i*3] = tmp.r; col[i*3+1] = tmp.g; col[i*3+2] = tmp.b;
+    size[i]  = 0.35 + Math.random()*1.05;
+    phase[i] = Math.random()*TAU;
+  }
+
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  g.setAttribute('aColor',   new THREE.BufferAttribute(col,3));
+  g.setAttribute('aSize',    new THREE.BufferAttribute(size,1));
+  g.setAttribute('aPhase',   new THREE.BufferAttribute(phase,1));
+
+  const m = new THREE.ShaderMaterial({
+    uniforms: starUniforms,
+    vertexShader:`
+      attribute float aSize;
+      attribute vec3  aColor;
+      attribute float aPhase;
+      uniform float uTime;
+      uniform float uPixelRatio;
+      varying vec3 vColor;
+      varying float vTw;
+      void main(){
+        vColor = aColor;
+        float tw = 0.55 + 0.45*sin(uTime*1.6 + aPhase);
+        vTw = tw;
+        vec4 mv = modelViewMatrix * vec4(position,1.0);
+        gl_PointSize = aSize * uPixelRatio * (150.0 / -mv.z) * (0.7 + 0.6*tw);
+        gl_Position = projectionMatrix * mv;
+      }
+    `,
+    fragmentShader:`
+      varying vec3 vColor;
+      varying float vTw;
+      void main(){
+        vec2 d = gl_PointCoord - 0.5;
+        float r = length(d);
+        float a = smoothstep(0.5, 0.0, r);
+        a = pow(a, 2.0) * (0.45 + 0.55*vTw);
+        if(a < 0.004) discard;
+        gl_FragColor = vec4(vColor * (0.7 + 0.6*vTw), a);
+      }
+    `,
+    transparent:true,
+    depthWrite:false,
+    blending:THREE.AdditiveBlending,
+  });
+
+  const pts = new THREE.Points(g, m);
+  pts.frustumCulled = false;
+  scene.add(pts);
+})();
+
+(function createNebula(){
+  const specs = [
+    { p:[-30, 10,-70], s:130, c:0xff7fb8, o:0.085 },
+    { p:[ 55,-18,-80], s:150, c:0x8a6bff, o:0.065 },
+    { p:[ 20, 42, 60], s:120, c:0xff9ecb, o:0.055 },
+    { p:[-70,-30, 40], s:140, c:0x5f4bff, o:0.05  },
+    { p:[  0, -8,-95], s:190, c:0xff86b9, o:0.055 },
+  ];
+  for(const s of specs){
+    const mat = new THREE.SpriteMaterial({
+      map: glowTex, color: s.c, transparent:true, opacity: s.o,
+      blending: THREE.AdditiveBlending, depthWrite:false, depthTest:false
+    });
+    const sp = new THREE.Sprite(mat);
+    sp.position.set(s.p[0], s.p[1], s.p[2]);
+    sp.scale.setScalar(s.s);
+    scene.add(sp);
+  }
+})();
+
+/* =========================================================
+   4. 心形参数
+   ========================================================= */
+const HEART_SCALE = 1.50;
+const HEART_DEPTH = 0.95;
+const HEART_Y_OFF = 0.16;
+
+function heart2D(t){
+  const x = 16*Math.pow(Math.sin(t),3);
+  const y = 13*Math.cos(t) - 5*Math.cos(2*t) - 2*Math.cos(3*t) - Math.cos(4*t);
+  return [ x/16, y/16 + HEART_Y_OFF ];
+}
+
+function heartSurface(t,u,side){
+  const h = heart2D(t);
+  const px = h[0]*HEART_SCALE*u;
+  const py = h[1]*HEART_SCALE*u;
+  const pz = side*HEART_DEPTH*Math.sqrt(Math.max(0, 1-u*u));
+  return [px,py,pz];
+}
+
+function pickPositions(n){
+  const M = Math.max(500, n*45);
+  const cands = new Float32Array(M*3);
+  for(let i=0;i<M;i++){
+    const t = Math.random()*TAU;
+    const u = Math.sqrt(Math.random());
+    const side = (i%2===0) ? 1 : -1;
+    const p = heartSurface(t,u,side);
+    cands[i*3]=p[0]; cands[i*3+1]=p[1]; cands[i*3+2]=p[2];
+  }
+  const chosen = [];
+  const dist = new Float32Array(M).fill(Infinity);
+  let idx = Math.floor(Math.random()*M);
+  chosen.push([cands[idx*3],cands[idx*3+1],cands[idx*3+2]]);
+
+  for(let k=1;k<n;k++){
+    const last = chosen[chosen.length-1];
+    let best=-1, bestD=-1;
+    for(let i=0;i<M;i++){
+      const dx = cands[i*3]-last[0];
+      const dy = cands[i*3+1]-last[1];
+      const dz = cands[i*3+2]-last[2];
+      const dd = dx*dx+dy*dy+dz*dz;
+      if(dd < dist[i]) dist[i] = dd;
+      if(dist[i] > bestD){ bestD = dist[i]; best = i; }
+    }
+    if(best < 0) break;
+    chosen.push([cands[best*3],cands[best*3+1],cands[best*3+2]]);
+  }
+  return chosen;
+}
+
+/* =========================================================
+   5. 照片材质
+   ========================================================= */
+function makePhotoMaterial(tex){
+  return new THREE.ShaderMaterial({
+    uniforms:{
+      uMap:{value:tex},
+      uHover:{value:0},
+      uOpacity:{value:1},
+      uPad:{value:0.078}
+    },
+    vertexShader:`
+      varying vec2 vUv;
+      void main(){
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
+      }
+    `,
+    fragmentShader:`
+      precision highp float;
+      uniform sampler2D uMap;
+      uniform float uHover;
+      uniform float uOpacity;
+      uniform float uPad;
+      varying vec2 vUv;
+
+      void main(){
+        vec2 puv = (vUv - uPad) / (1.0 - 2.0*uPad);
+
+        vec2 q = abs(puv - 0.5);
+        float rr = 0.05;
+        float d = length(max(q - vec2(0.5 - rr), 0.0)) - rr;
+        float mask = 1.0 - smoothstep(-0.006, 0.006, d);
+
+        vec2 qv = abs(vUv - 0.5) - (0.5 - uPad);
+        float gd = length(max(qv, 0.0));
+        float glow = 1.0 - smoothstep(0.0, uPad*0.95, gd);
+        glow = pow(glow, 1.7) * uHover;
+
+        if(mask <= 0.002 && glow <= 0.002) discard;
+
+        vec3 col = texture2D(uMap, clamp(puv, 0.002, 0.998)).rgb;
+        col *= (0.96 + 0.14*uHover);
+        col += vec3(1.0, 0.42, 0.70) * glow * 0.95;
+
+        float alpha = max(mask * uOpacity, glow * 0.9 * uOpacity);
+        if(alpha < 0.004) discard;
+        gl_FragColor = vec4(col, alpha);
+      }
+    `,
+    transparent:true,
+    depthWrite:false,
+    side:THREE.DoubleSide,
+  });
+}
+
+/* =========================================================
+   6. 烟花系统
+   ========================================================= */
+const MAX_PARTICLES = 2200;
+const MAX_TRAIL_SEG = 9000;
+
+class Fireworks {
+  constructor(parent){
+    this.sceneRoot = parent;
+    this.list = [];
+    this.photoSprites = [];
+    this.photoTexPool = [];
+
+    const g = new THREE.BufferGeometry();
+    this.pPos  = new Float32Array(MAX_PARTICLES*3);
+    this.pCol  = new Float32Array(MAX_PARTICLES*3);
+    this.pSize = new Float32Array(MAX_PARTICLES);
+    g.setAttribute('position', new THREE.BufferAttribute(this.pPos,3));
+    g.setAttribute('aColor',   new THREE.BufferAttribute(this.pCol,3));
+    g.setAttribute('aSize',    new THREE.BufferAttribute(this.pSize,1));
+    g.setDrawRange(0,0);
+
+    const mat = new THREE.ShaderMaterial({
+      uniforms:{ uPixelRatio:{value:renderer.getPixelRatio()} },
+      vertexShader:`
+        attribute float aSize;
+        attribute vec3 aColor;
+        uniform float uPixelRatio;
+        varying vec3 vColor;
+        void main(){
+          vColor = aColor;
+          vec4 mv = modelViewMatrix * vec4(position,1.0);
+          gl_PointSize = aSize * uPixelRatio * (170.0 / -mv.z);
+          gl_Position = projectionMatrix * mv;
+        }
+      `,
+      fragmentShader:`
+        varying vec3 vColor;
+        void main(){
+          vec2 d = gl_PointCoord - 0.5;
+          float r = length(d);
+          float a = smoothstep(0.5, 0.0, r);
+          a = pow(a, 1.7);
+          if(a < 0.004) discard;
+          gl_FragColor = vec4(vColor * a * 1.5, a);
+        }
+      `,
+      transparent:true,
+      depthWrite:false,
+      blending:THREE.AdditiveBlending,
+    });
+
+    this.points = new THREE.Points(g, mat);
+    this.points.frustumCulled = false;
+    this.points.renderOrder = 10;
+    parent.add(this.points);
+    this.pGeo = g;
+
+    const tg = new THREE.BufferGeometry();
+    this.tPos = new Float32Array(MAX_TRAIL_SEG*2*3);
+    this.tCol = new Float32Array(MAX_TRAIL_SEG*2*3);
+    tg.setAttribute('position', new THREE.BufferAttribute(this.tPos,3));
+    tg.setAttribute('color',    new THREE.BufferAttribute(this.tCol,3));
+    tg.setDrawRange(0,0);
+    this.lines = new THREE.LineSegments(tg, new THREE.LineBasicMaterial({
+      vertexColors:true, transparent:true, opacity:1,
+      blending:THREE.AdditiveBlending, depthWrite:false
+    }));
+    this.lines.frustumCulled = false;
+    this.lines.renderOrder = 9;
+    parent.add(this.lines);
+    this.tGeo = tg;
+  }
+
+  add(o){
+    if(this.list.length >= MAX_PARTICLES) return null;
+    const p = {
+      pos: o.pos.clone(),
+      vel: o.vel.clone(),
+      life: o.life,
+      maxLife: o.life,
+      grav: o.grav ?? 1.6,
+      drag: o.drag ?? 0.7,
+      size: o.size ?? 2,
+      color: o.color,
+      secondary: o.secondary ?? false,
+      trail: [],
+      trailLen: o.trailLen ?? 8,
+      dead: false,
+    };
+    this.list.push(p);
+    return p;
+  }
+
+  clear(){
+    this.list.length = 0;
+    this.pGeo.setDrawRange(0,0);
+    this.tGeo.setDrawRange(0,0);
+    for(const ps of this.photoSprites){
+      this.sceneRoot.remove(ps.sprite);
+      ps.sprite.material.dispose();
+    }
+    this.photoSprites.length = 0;
+  }
+
+  attachPhotosToParticles(particles, count){
+    if(!this.photoTexPool.length) return;
+    const pool = particles.slice();
+    for(let i=pool.length-1;i>0;i--){
+      const j = Math.floor(Math.random()*(i+1));
+      const t = pool[i]; pool[i] = pool[j]; pool[j] = t;
+    }
+    let added = 0;
+    for(const p of pool){
+      if(added >= count) break;
+      if(this.photoSprites.length >= 90) break;
+      const tex = this.photoTexPool[Math.floor(Math.random()*this.photoTexPool.length)];
+      if(!tex) continue;
+
+      const m = new THREE.SpriteMaterial({
+        map: tex,
+        transparent:true,
+        opacity:1,
+        depthWrite:false,
+        blending: THREE.NormalBlending,
+      });
+      const sp = new THREE.Sprite(m);
+      sp.position.copy(p.pos);
+      sp.scale.setScalar(0.17);
+      sp.renderOrder = 11;
+      this.sceneRoot.add(sp);
+      this.photoSprites.push({ sprite: sp, particle: p, life: 0.6 });
+      added++;
+    }
+  }
+
+  update(dt){
+    const list = this.list;
+
+    for(let i=list.length-1;i>=0;i--){
+      const p = list[i];
+      p.life -= dt;
+      if(p.life <= 0){
+        if(p.secondary && p.pos.length() < 12){
+          this.spawnSecondary(p.pos);
+        }
+        p.dead = true;
+        list.splice(i,1);
+        continue;
+      }
+      p.vel.y -= p.grav * dt;
+      const dr = 1 - p.drag * dt;
+      p.vel.multiplyScalar(dr < 0 ? 0 : dr);
+      p.pos.addScaledVector(p.vel, dt);
+
+      p.trail.push(p.pos.x, p.pos.y, p.pos.z);
+      if(p.trail.length > p.trailLen*3) p.trail.splice(0,3);
+    }
+
+    let n = 0;
+    for(let i=0;i<list.length && n<MAX_PARTICLES;i++,n++){
+      const p = list[i];
+      this.pPos[n*3]   = p.pos.x;
+      this.pPos[n*3+1] = p.pos.y;
+      this.pPos[n*3+2] = p.pos.z;
+      const k = clamp(p.life / p.maxLife, 0, 1);
+      const fade = 0.25 + 0.75 * k;
+      this.pCol[n*3]   = p.color.r * fade;
+      this.pCol[n*3+1] = p.color.g * fade;
+      this.pCol[n*3+2] = p.color.b * fade;
+      this.pSize[n]    = p.size * (0.45 + 0.75*k);
+    }
+    this.pGeo.setDrawRange(0, n);
+    this.pGeo.attributes.position.needsUpdate = true;
+    this.pGeo.attributes.aColor.needsUpdate = true;
+    this.pGeo.attributes.aSize.needsUpdate = true;
+
+    let seg = 0;
+    for(let i=0;i<list.length;i++){
+      const p = list[i];
+      const t = p.trail;
+      const cnt = t.length/3;
+      if(cnt < 2) continue;
+      const lifeK = clamp(p.life/p.maxLife, 0, 1);
+      for(let j=0;j<cnt-1 && seg<MAX_TRAIL_SEG;j++){
+        const i0 = j*3, i1 = (j+1)*3;
+        const a = 1 - j/cnt;
+        const f = a*a * lifeK * 0.9;
+
+        this.tPos[seg*6+0] = t[i0];
+        this.tPos[seg*6+1] = t[i0+1];
+        this.tPos[seg*6+2] = t[i0+2];
+        this.tPos[seg*6+3] = t[i1];
+        this.tPos[seg*6+4] = t[i1+1];
+        this.tPos[seg*6+5] = t[i1+2];
+
+        this.tCol[seg*6+0] = p.color.r*f;
+        this.tCol[seg*6+1] = p.color.g*f;
+        this.tCol[seg*6+2] = p.color.b*f;
+        this.tCol[seg*6+3] = p.color.r*f*0.55;
+        this.tCol[seg*6+4] = p.color.g*f*0.55;
+        this.tCol[seg*6+5] = p.color.b*f*0.55;
+        seg++;
+      }
+    }
+    this.tGeo.setDrawRange(0, seg*2);
+    this.tGeo.attributes.position.needsUpdate = true;
+    this.tGeo.attributes.color.needsUpdate = true;
+
+    for(let i=this.photoSprites.length-1;i>=0;i--){
+      const ps = this.photoSprites[i];
+      const pt = ps.particle;
+      if(pt.dead || pt.life <= 0){
+        ps.life -= dt;
+        if(ps.life <= 0){
+          this.sceneRoot.remove(ps.sprite);
+          ps.sprite.material.dispose();
+          this.photoSprites.splice(i,1);
+          continue;
+        }
+        ps.sprite.material.opacity = Math.max(0, ps.life / 0.6);
+        ps.sprite.position.copy(pt.pos);
+      }else{
+        ps.sprite.position.copy(pt.pos);
+        const k = clamp(pt.life/pt.maxLife, 0, 1);
+        ps.sprite.material.opacity = Math.min(1, k*1.8 + 0.2);
+        ps.sprite.scale.setScalar(0.13 + 0.10 * (1 - k));
+      }
+    }
+  }
+
+  mainBurst(origin){
+    const created = [];
+
+    for(let i=0;i<24;i++){
+      const dir = new V3(rand(-1,1),rand(-1,1),rand(-1,1)).normalize();
+      this.add({
+        pos: origin,
+        vel: dir.multiplyScalar(rand(0.4, 1.4)),
+        life: 0.22 + Math.random()*0.22,
+        grav: 0,
+        drag: 3.2,
+        size: 5.5,
+        color: new THREE.Color(0xfff8e2),
+        trailLen: 3,
+      });
+    }
+
+    const N = isMobile ? 200 : 300;
+    const ga = Math.PI * (3 - Math.sqrt(5));
+
+    for(let i=0;i<N;i++){
+      const y = 1 - (i/(N-1))*2;
+      const r = Math.sqrt(Math.max(0,1-y*y));
+      const phi = i*ga;
+
+      const dir = new V3(
+        Math.cos(phi)*r + rand(-0.14,0.14),
+        y              + rand(-0.14,0.14),
+        Math.sin(phi)*r + rand(-0.14,0.14)
+      ).normalize();
+
+      const speed = 4.8 - Math.abs(y)*1.4 + Math.random()*1.6;
+
+      const c = new THREE.Color();
+      c.setHSL(0.095 + Math.random()*0.035, 0.95, 0.62 + Math.random()*0.25);
+
+      const p = this.add({
+        pos: origin,
+        vel: dir.multiplyScalar(speed),
+        life: 1.5 + Math.random()*1.2,
+        grav: 1.1 + Math.random()*0.9,
+        drag: 0.72,
+        size: 1.0 + Math.random()*1.5,
+        color: c,
+        secondary: Math.random() < 0.26,
+        trailLen: 14,
+      });
+      if(p) created.push(p);
+    }
+
+    for(let i=0;i<14;i++){
+      const a  = Math.random()*TAU;
+      const el = rand(-0.25, 0.85);
+      const dir = new V3(
+        Math.cos(a)*Math.cos(el),
+        Math.sin(el),
+        Math.sin(a)*Math.cos(el)
+      ).normalize();
+
+      const c = new THREE.Color();
+      c.setHSL(0.085 + Math.random()*0.03, 1.0, 0.70);
+
+      this.add({
+        pos: origin,
+        vel: dir.multiplyScalar(rand(2.4, 3.4)),
+        life: 2.2 + Math.random()*1.0,
+        grav: 1.6,
+        drag: 0.55,
+        size: 2.2,
+        color: c,
+        secondary: false,
+        trailLen: 20,
+      });
+    }
+
+    this.attachPhotosToParticles(created, isMobile ? 16 : 24);
+  }
+
+  spawnSecondary(pos){
+    const N = 5 + Math.floor(Math.random()*6);
+    for(let i=0;i<N;i++){
+      const dir = new V3(rand(-1,1),rand(-1,1),rand(-1,1)).normalize();
+      const c = new THREE.Color();
+      c.setHSL(0.10 + Math.random()*0.05, 0.9, 0.62 + Math.random()*0.2);
+      this.add({
+        pos: pos, vel: dir.multiplyScalar(rand(0.6,1.7)),
+        life: 0.45 + Math.random()*0.6,
+        grav: 2.6, drag: 1.2,
+        size: 0.9 + Math.random()*0.9,
+        color: c, trailLen: 5,
+      });
+    }
+  }
+
+  starRain(){
+    const N = isMobile ? 110 : 170;
+    for(let i=0;i<N;i++){
+      const a = Math.random()*TAU;
+      const r = Math.random()*5.5;
+      const c = new THREE.Color();
+      c.setHSL(0.10 + Math.random()*0.06, 0.85, 0.62 + Math.random()*0.22);
+      this.add({
+        pos: new V3(Math.cos(a)*r, rand(3.5,6.5), Math.sin(a)*r*0.7),
+        vel: new V3(rand(-0.35,0.35), rand(-1.6,-0.7), rand(-0.35,0.35)),
+        life: 2.6 + Math.random()*2.2,
+        grav: 0.55, drag: 0.25,
+        size: 0.9 + Math.random()*1.2,
+        color: c, trailLen: 6,
+      });
+    }
+  }
+}
+
+/* =========================================================
+   7. 场景主体
+   ========================================================= */
+const heartGroup = new THREE.Group();
+scene.add(heartGroup);
+
+const fireworks = new Fireworks(scene);
+
+const floatHearts = [];
+(function createFloatHearts(){
+  const N = isMobile ? 12 : 18;
+  for(let i=0;i<N;i++){
+    const mat = new THREE.SpriteMaterial({
+      map: heartTex,
+      transparent:true,
+      opacity: rand(0.22,0.55),
+      blending: THREE.AdditiveBlending,
+      depthWrite:false,
+    });
+    const sp = new THREE.Sprite(mat);
+    const a = Math.random()*TAU;
+    const rr = rand(3.2, 6.6);
+    const y  = rand(-2.4, 2.6);
+    sp.position.set(Math.cos(a)*rr, y, Math.sin(a)*rr*0.8);
+    const s = rand(0.22, 0.5);
+    sp.scale.setScalar(s);
+    sp.userData = {
+      baseY: y,
+      baseX: sp.position.x,
+      baseZ: sp.position.z,
+      amp: rand(0.18,0.5),
+      speed: rand(0.35,0.8),
+      phase: Math.random()*TAU,
+      scale: s,
+      orbitSpeed: rand(-0.06, 0.06),
+    };
+    scene.add(sp);
+    floatHearts.push(sp);
+  }
+})();
+
+const collapseGlow = new THREE.Sprite(new THREE.SpriteMaterial({
+  map: glowTex, color: 0xffc6e0,
+  transparent:true, opacity:0,
+  blending: THREE.AdditiveBlending,
+  depthWrite:false, depthTest:false
+}));
+collapseGlow.scale.setScalar(0.001);
+collapseGlow.renderOrder = 20;
+scene.add(collapseGlow);
+
+const photos = [];
+let photoURLs = [];
+
+/* =========================================================
+   8. IndexedDB
+   ========================================================= */
+const DB_NAME = 'heart-album-db';
+const STORE = 'photos';
+let dbPromise = null;
+
+function openDB(){
+  if(dbPromise) return dbPromise;
+  dbPromise = new Promise((resolve, reject)=>{
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = ()=>{
+      const db = req.result;
+      if(!db.objectStoreNames.contains(STORE)){
+        db.createObjectStore(STORE, { keyPath:'id', autoIncrement:true });
+      }
+    };
+    req.onsuccess = ()=> resolve(req.result);
+    req.onerror   = ()=> reject(req.error);
+  });
+  return dbPromise;
+}
+async function dbAll(){
+  const db = await openDB();
+  return new Promise((res,rej)=>{
+    const tx = db.transaction(STORE,'readonly');
+    const rq = tx.objectStore(STORE).getAll();
+    rq.onsuccess = ()=> res(rq.result || []);
+    rq.onerror   = ()=> rej(rq.error);
+  });
+}
+async function dbAdd(blob){
+  const db = await openDB();
+  return new Promise((res,rej)=>{
+    const tx = db.transaction(STORE,'readwrite');
+    const rq = tx.objectStore(STORE).add({ blob, t: Date.now() });
+    rq.onsuccess = ()=> res(rq.result);
+    rq.onerror   = ()=> rej(rq.error);
+  });
+}
+async function dbClear(){
+  const db = await openDB();
+  return new Promise((res,rej)=>{
+    const tx = db.transaction(STORE,'readwrite');
+    const rq = tx.objectStore(STORE).clear();
+    rq.onsuccess = ()=> res();
+    rq.onerror   = ()=> rej(rq.error);
+  });
+}
+
+/* =========================================================
+   9. 图片压缩
+   ========================================================= */
+const MAX_SIDE = isMobile ? 560 : 640;
+
+function fileToBlob(file){
+  return new Promise((resolve, reject)=>{
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = ()=>{
+      let w = img.naturalWidth, h = img.naturalHeight;
+      const sc = Math.min(1, MAX_SIDE/Math.max(w,h));
+      w = Math.max(1, Math.round(w*sc));
+      h = Math.max(1, Math.round(h*sc));
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      const ctx = c.getContext('2d');
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, w, h);
+      c.toBlob(b=>{
+        URL.revokeObjectURL(url);
+        if(b) resolve(b); else reject(new Error('toBlob failed'));
+      }, 'image/jpeg', 0.86);
+    };
+    img.onerror = ()=>{ URL.revokeObjectURL(url); reject(new Error('image load fail')); };
+    img.src = url;
+  });
+}
+
+function loadImageFromBlob(blob){
+  return new Promise((resolve, reject)=>{
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = ()=> resolve({ img, url });
+    img.onerror = ()=>{ URL.revokeObjectURL(url); reject(new Error('load fail')); };
+    img.src = url;
+  });
+}
+
+/* =========================================================
+   10. 构建照片
+   ========================================================= */
+function disposePhotos(){
+  for(const p of photos){
+    heartGroup.remove(p.mesh);
+    p.mesh.geometry.dispose();
+    p.mesh.material.dispose();
+    if(p.texture) p.texture.dispose();
+    if(p.url) URL.revokeObjectURL(p.url);
+  }
+  photos.length = 0;
+  photoURLs = [];
+}
+
+async function buildPhotos(){
+  disposePhotos();
+  fireworks.clear();
+
+  const items = await dbAll();
+  if(!items.length){
+    document.getElementById('empty').classList.add('on');
+    return;
+  }
+  document.getElementById('empty').classList.remove('on');
+
+  const positions = pickPositions(items.length);
+
+  for(let i=0;i<items.length;i++){
+    let loaded;
+    try{ loaded = await loadImageFromBlob(items[i].blob); }
+    catch(e){ continue; }
+
+    const { img, url } = loaded;
+    photoURLs.push(url);
+
+    const aspect = img.naturalWidth / img.naturalHeight;
+    const BASE = 0.50;
+    let w, h;
+    if(aspect >= 1){ w = BASE; h = BASE/aspect; }
+    else           { h = BASE; w = BASE*aspect; }
+
+    const tex = new THREE.Texture(img);
+    tex.needsUpdate = true;
+    tex.colorSpace = THREE.NoColorSpace;
+    tex.minFilter = THREE.LinearMipmapLinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+    tex.generateMipmaps = true;
+    tex.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
+
+    const geo = new THREE.PlaneGeometry(w*1.18, h*1.18);
+    const mat = makePhotoMaterial(tex);
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.frustumCulled = false;
+
+    const pos = positions[i] || [0,0,0];
+    const homePos = new V3(pos[0], pos[1], pos[2]);
+    const normal = new V3(pos[0]*0.45, pos[1]*0.45, pos[2]*2.2).normalize();
+
+    const q = new THREE.Quaternion().setFromUnitVectors(new V3(0,0,1), normal);
+    const roll = new THREE.Quaternion().setFromAxisAngle(new V3(0,0,1), rand(-0.5,0.5));
+    q.multiply(roll);
+
+    mesh.position.copy(homePos);
+    mesh.quaternion.copy(q);
+    mesh.scale.setScalar(0.001);
+
+    const photo = {
+      mesh, texture: tex, url,
+      homePos, homeQuat: q, normal,
+      startPos: new V3(), startQuat: new THREE.Quaternion(),
+      bend: new V3(),
+      delay: 0, dur: 2,
+      bobPhase: Math.random()*TAU,
+      hover: 0, hoverTarget: 0,
+      opacity: 0,
+      aspect,
+      flyT: 0, flyDelay: 0,
+      vel: new V3(),
+      spinDir: 1,
+    };
+    mesh.userData.photo = photo;
+
+    heartGroup.add(mesh);
+    photos.push(photo);
+  }
+
+  assignStartPositions();
+}
+
+function assignStartPositions(){
+  for(let i=0;i<photos.length;i++){
+    const p = photos[i];
+    const a = Math.random()*TAU;
+    const b = Math.acos(2*Math.random()-1);
+    const r = rand(9, 18);
+    p.startPos.set(
+      Math.sin(b)*Math.cos(a)*r,
+      Math.cos(b)*r*0.85 + rand(-2,4),
+      Math.sin(b)*Math.sin(a)*r
+    );
+    p.startQuat.setFromEuler(new THREE.Euler(rand(-3,3), rand(-3,3), rand(-3,3)));
+    p.bend.set(rand(-3,3), rand(-3,3), rand(-3,3));
+    p.delay = Math.random()*0.85;
+    p.dur   = rand(1.7, 2.4);
+  }
+}
+
+/* =========================================================
+   11. 阶段
+   ========================================================= */
+const S = {
+  GATHER:'gather',
+  HOLD:'hold',
+  SPIN:'spin',
+  IDLE:'idle',
+  COLLAPSE:'collapse',
+  BURST:'burst',
+  CAROUSEL:'carousel'
+};
+let phase = S.GATHER;
+let phaseT = 0;
+
+const btnCreate = document.getElementById('btnCreate');
+
+function setPhase(p){
+  phase = p;
+  phaseT = 0;
+  if(p === S.IDLE){
+    btnCreate.classList.add('show');
+  }else{
+    btnCreate.classList.remove('show');
+  }
+}
+
+function resetToGather(){
+  heartGroup.rotation.y = 0;
+  fireworks.clear();
+  for(const p of photos){
+    p.opacity = 0;
+    p.mesh.scale.setScalar(0.001);
+    p.mesh.position.copy(p.startPos);
+  }
+  collapseGlow.material.opacity = 0;
+  collapseGlow.scale.setScalar(0.001);
+  carouselEl.classList.remove('on');
+  stopCarousel();
+  assignStartPositions();
+  setPhase(S.GATHER);
+}
+
+/* =========================================================
+   12. 主更新（停顿已减半：0.6 → 0.3）
+   ========================================================= */
+function updatePhases(dt){
+  phaseT += dt;
+
+  if(phase === S.GATHER && phaseT > 3.4){
+    setPhase(S.HOLD);
+  }
+  else if(phase === S.HOLD && phaseT > 0.3){   /* 原来 0.6，减半 */
+    setPhase(S.SPIN);
+  }
+  else if(phase === S.SPIN && phaseT > 2.8){
+    heartGroup.rotation.y = 0;
+    setPhase(S.IDLE);
+  }
+  else if(phase === S.COLLAPSE && phaseT > 1.5){
+    setPhase(S.BURST);
+    triggerBurst();
+  }
+  else if(phase === S.BURST && phaseT > 4.4){
+    setPhase(S.CAROUSEL);
+    startCarousel();
+  }
+}
+
+function updatePhotos(dt, time){
+  const t = phaseT;
+
+  for(let i=0;i<photos.length;i++){
+    const p = photos[i];
+    const m = p.mesh;
+
+    if(phase === S.GATHER){
+      const k = clamp((t - p.delay) / p.dur, 0, 1);
+      const e = easeOutQuint(k);
+      m.position.lerpVectors(p.startPos, p.homePos, e);
+      const w = Math.sin(Math.PI * e);
+      m.position.x += p.bend.x * w;
+      m.position.y += p.bend.y * w;
+      m.position.z += p.bend.z * w;
+      m.quaternion.slerpQuaternions(p.startQuat, p.homeQuat, e);
+      m.scale.setScalar(lerp(0.3, 1, e));
+      p.opacity = k;
+
+    }else if(phase === S.HOLD || phase === S.SPIN || phase === S.IDLE){
+      const bob = Math.sin(time*0.85 + p.bobPhase) * 0.035;
+      m.position.copy(p.homePos).addScaledVector(p.normal, bob);
+      m.quaternion.copy(p.homeQuat);
+      m.scale.setScalar(1);
+      p.opacity = 1;
+
+    }else if(phase === S.COLLAPSE){
+      const e = easeInOutCubic(clamp(t/1.35, 0, 1));
+      m.position.copy(p.homePos).multiplyScalar(1-e);
+      m.position.x += Math.sin(t*22 + i)*0.03*(1-e);
+      m.quaternion.copy(p.homeQuat);
+      m.scale.setScalar(Math.max(0.001, 1-e));
+      p.opacity = 1-e;
+
+    }else if(phase === S.BURST){
+      p.flyT += dt;
+      const tt = p.flyT - p.flyDelay;
+      if(tt <= 0){
+        m.position.set(0,0,0);
+        m.scale.setScalar(0.001);
+        p.opacity = 0;
+      }else{
+        p.vel.y -= 2.4 * dt;
+        p.vel.multiplyScalar(1 - 0.35*dt);
+        m.position.addScaledVector(p.vel, dt);
+        m.rotation.z += dt * 0.9 * p.spinDir;
+        m.rotation.x += dt * 0.4 * p.spinDir;
+
+        const k = clamp(tt/2.4, 0, 1);
+        const grow = 0.32 + 0.8 * easeOutCubic(clamp(tt*4,0,1));
+        m.scale.setScalar(Math.max(0.001, grow * (1 - easeInCubic(k))));
+        p.opacity = 1 - k;
+      }
+    }else if(phase === S.CAROUSEL){
+      m.scale.setScalar(0.001);
+      p.opacity = 0;
+    }
+
+    const hv = p.hoverTarget;
+    p.hover += (hv - p.hover) * Math.min(1, dt*12);
+    m.material.uniforms.uHover.value = p.hover;
+    m.material.uniforms.uOpacity.value = clamp(p.opacity, 0, 1);
+
+    if(p.hover > 0.001 && (phase === S.IDLE || phase === S.HOLD || phase === S.SPIN)){
+      m.position.addScaledVector(p.normal, p.hover * 0.09);
+      m.scale.multiplyScalar(1 + p.hover * 0.05);
+    }
+  }
+}
+
+function updateFloatHearts(dt, time){
+  for(const sp of floatHearts){
+    const u = sp.userData;
+    if(phase === S.COLLAPSE || phase === S.BURST || phase === S.CAROUSEL){
+      sp.position.multiplyScalar(0.001);
+      sp.material.opacity = lerp(sp.material.opacity, 0, dt*6);
+      continue;
+    }
+    const a = u.phase + time * u.orbitSpeed;
+    sp.position.x = u.baseX * Math.cos(a) - u.baseZ * Math.sin(a);
+    sp.position.z = u.baseX * Math.sin(a) + u.baseZ * Math.cos(a);
+    sp.position.y = u.baseY + Math.sin(time*u.speed + u.phase) * u.amp;
+    sp.material.opacity = 0.28 + 0.22*Math.sin(time*0.9 + u.phase);
+    const s = u.scale * (1 + 0.12*Math.sin(time*1.3 + u.phase));
+    sp.scale.setScalar(s);
+  }
+}
+
+function updateCollapseGlow(dt){
+  const mat = collapseGlow.material;
+  if(phase === S.COLLAPSE){
+    const e = easeInOutCubic(clamp(phaseT/1.35, 0, 1));
+    collapseGlow.scale.setScalar(0.001 + e*0.9);
+    mat.opacity = e * 0.95;
+    collapseGlow.position.set(0,0,0);
+  }else if(phase === S.BURST){
+    const e = clamp(phaseT/0.4, 0, 1);
+    collapseGlow.scale.setScalar(0.9 + e*4.5);
+    mat.opacity = 1 - e;
+  }else if(phase === S.GATHER || phase === S.HOLD || phase === S.SPIN || phase === S.IDLE){
+    mat.opacity = 0;
+    collapseGlow.scale.setScalar(0.001);
+  }
+}
+
+function triggerBurst(){
+  heartGroup.rotation.y = 0;
+
+  const origin = new V3(0,0,0);
+
+  collapseGlow.position.copy(origin);
+  collapseGlow.material.opacity = 1;
+  collapseGlow.scale.setScalar(0.9);
+
+  fireworks.photoTexPool = photos.map(p=>p.texture).filter(Boolean);
+  fireworks.mainBurst(origin);
+
+  for(let i=0;i<photos.length;i++){
+    const p = photos[i];
+    p.flyT = 0;
+    p.flyDelay = Math.random()*0.3;
+    p.spinDir = Math.random() < 0.5 ? -1 : 1;
+
+    const a = Math.random()*TAU;
+    const el = rand(-0.35, 1.0);
+    const dir = new V3(
+      Math.cos(a)*Math.cos(el),
+      Math.sin(el),
+      Math.sin(a)*Math.cos(el)
+    ).normalize();
+
+    const sp = rand(2.6, 5.2);
+    p.vel.copy(dir).multiplyScalar(sp);
+    p.vel.y += 1.2;
+
+    p.mesh.position.set(0,0,0);
+    p.mesh.rotation.set(0,0,0);
+    p.mesh.quaternion.copy(p.homeQuat);
+  }
+
+  setTimeout(()=>{ fireworks.starRain(); }, 1000);
+  setTimeout(()=>{ fireworks.starRain(); }, 2000);
+}
+
+/* =========================================================
+   13. 胶卷轮播（粉色相框 + 当前放大）— 方向改为向左滚
+   ========================================================= */
+const carouselEl  = document.getElementById('carousel');
+const filmStrip   = document.getElementById('filmStrip');
+const lightbox    = document.getElementById('lightbox');
+const lightboxImg = lightbox.querySelector('img');
+
+let filmTimer = null;
+let filmOffset = 0;
+let cellW = 220, cellH = 280, gap = 120, step = 340;
+let viewW = window.innerWidth;
+
+function computeCell(){
+  const w = window.innerWidth, h = window.innerHeight;
+  let cw;
+  if(w < 600){
+    cw = Math.min(w * 0.44, h * 0.40);
+  }else{
+    cw = Math.min(w * 0.20, h * 0.42, 300);
+  }
+  cellW = Math.max(130, Math.round(cw));
+  gap   = Math.round(cellW * 0.55);
+  cellH = Math.round(cellW * 1.22);
+  step  = cellW + gap;
+  viewW = w;
+}
+
+function buildFilm(){
+  filmStrip.innerHTML = '';
+  const N = photoURLs.length;
+  if(!N) return;
+
+  const frag = document.createDocumentFragment();
+  for(let g=0; g<3; g++){
+    for(let i=N-1; i>=0; i--){
+      const wrap = document.createElement('div');
+      wrap.className = 'film-item';
+      wrap.dataset.idx = i;
+      wrap.style.width  = cellW + 'px';
+      wrap.style.height = cellH + 'px';
+      wrap.style.marginRight = gap + 'px';
+
+      const img = document.createElement('img');
+      img.src = photoURLs[i];
+      img.alt = '';
+      wrap.appendChild(img);
+      frag.appendChild(wrap);
+    }
+  }
+  filmStrip.appendChild(frag);
+
+  filmOffset = 2*N - 1;
+  updateStripPosition(false);
+  highlight();
+}
+
+function updateStripPosition(animate){
+  const N = photoURLs.length;
+  if(!N) return;
+  const T = viewW/2 - filmOffset*step - cellW/2;
+  if(!animate){
+    filmStrip.style.transition = 'none';
+    filmStrip.style.transform = `translateX(${T}px)`;
+    void filmStrip.offsetWidth;
+    filmStrip.style.transition = '';
+  }else{
+    filmStrip.style.transform = `translateX(${T}px)`;
+  }
+}
+
+function highlight(){
+  const N = photoURLs.length;
+  if(!N) return;
+  const p = ((filmOffset % N) + N) % N;
+  const idx = ((N - 1 - p) % N + N) % N;
+  const items = filmStrip.children;
+  for(let i=0;i<items.length;i++){
+    items[i].classList.toggle('active', +items[i].dataset.idx === idx);
+  }
+}
+
+/* 改为向左滚动：filmOffset 递增；到 3N-1 时无缝重置回 2N-1 */
+function filmNext(){
+  const N = photoURLs.length;
+  if(!N) return;
+
+  let next = filmOffset + 1;
+  if(next > 3*N - 1){
+    filmOffset = 2*N - 1;
+    updateStripPosition(false);
+    next = filmOffset + 1;
+  }
+  filmOffset = next;
+  updateStripPosition(true);
+  highlight();
+}
+
+function startCarousel(){
+  if(!photoURLs.length) return;
+  computeCell();
+  buildFilm();
+  carouselEl.classList.add('on');
+  if(filmTimer) clearInterval(filmTimer);
+  filmTimer = setInterval(filmNext, 2000);
+}
+
+function stopCarousel(){
+  if(filmTimer){ clearInterval(filmTimer); filmTimer = null; }
+}
+
+/* 点击当前居中照片全屏 */
+filmStrip.addEventListener('click', (e)=>{
+  const item = e.target.closest('.film-item');
+  if(!item || !item.classList.contains('active')) return;
+  const img = item.querySelector('img');
+  if(!img || !img.src) return;
+  lightboxImg.src = img.src;
+  lightbox.classList.add('on');
+});
+
+lightbox.addEventListener('click', ()=>{
+  lightbox.classList.remove('on');
+  lightboxImg.src = '';
+});
+
+/* =========================================================
+   14. 相机控制
+   ========================================================= */
+const pointers = new Map();
+let lastPinch = 0;
+let dragMoved = 0;
+let isDragging = false;
+
+const dom = renderer.domElement;
+
+dom.addEventListener('pointerdown', (e)=>{
+  dom.setPointerCapture(e.pointerId);
+  pointers.set(e.pointerId, { x:e.clientX, y:e.clientY });
+  if(pointers.size === 1){ dragMoved = 0; isDragging = true; }
+  if(pointers.size === 2){ lastPinch = 0; isDragging = false; }
+});
+
+dom.addEventListener('pointermove', (e)=>{
+  const prev = pointers.get(e.pointerId);
+  if(!prev) {
+    if(e.pointerType === 'mouse') onHover(e.clientX, e.clientY);
+    return;
+  }
+
+  const dx = e.clientX - prev.x;
+  const dy = e.clientY - prev.y;
+  pointers.set(e.pointerId, { x:e.clientX, y:e.clientY });
+
+  if(pointers.size === 1){
+    dragMoved += Math.abs(dx) + Math.abs(dy);
+    cam.tTheta -= dx * 0.006;
+    cam.tPhi   -= dy * 0.006;
+    cam.tPhi = clamp(cam.tPhi, 0.42, Math.PI - 0.42);
+  }else if(pointers.size === 2){
+    const arr = [...pointers.values()];
+    const d = Math.hypot(arr[0].x-arr[1].x, arr[0].y-arr[1].y);
+    if(lastPinch > 0 && d > 0){
+      cam.tRadius = clamp(cam.tRadius * (lastPinch/d), 3.8, 22);
+    }
+    lastPinch = d;
+  }
+  if(e.pointerType === 'mouse' && !isDragging) onHover(e.clientX, e.clientY);
+});
+
+function endPointer(e){
+  pointers.delete(e.pointerId);
+  if(pointers.size < 2) lastPinch = 0;
+  if(pointers.size === 0){
+    isDragging = false;
+    if(dragMoved < 8){
+      const hit = pickPhoto(e.clientX, e.clientY);
+      if(hit && hit.userData.photo && hit.userData.photo.opacity > 0.5){
+        openPhotoFull(hit.userData.photo);
+      }
+    }
+  }
+}
+dom.addEventListener('pointerup', endPointer);
+dom.addEventListener('pointercancel', endPointer);
+
+window.addEventListener('wheel', (e)=>{
+  cam.tRadius = clamp(cam.tRadius * (1 + e.deltaY * 0.0012), 3.8, 22);
+}, { passive:true });
+
+const raycaster = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+
+function pickPhoto(cx, cy){
+  ndc.x = (cx / window.innerWidth) * 2 - 1;
+  ndc.y = -(cy / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(ndc, camera);
+  const list = [];
+  for(const p of photos){ if(p.opacity > 0.3) list.push(p.mesh); }
+  if(!list.length) return null;
+  const hits = raycaster.intersectObjects(list, false);
+  return hits.length ? hits[0].object : null;
+}
+
+let hoveredPhoto = null;
+function onHover(cx, cy){
+  if(phase !== S.IDLE && phase !== S.HOLD && phase !== S.SPIN){
+    if(hoveredPhoto){ hoveredPhoto.hoverTarget = 0; hoveredPhoto = null; }
+    return;
+  }
+  const hit = pickPhoto(cx, cy);
+  const p = hit ? hit.userData.photo : null;
+  if(p !== hoveredPhoto){
+    if(hoveredPhoto) hoveredPhoto.hoverTarget = 0;
+    hoveredPhoto = p;
+    if(hoveredPhoto) hoveredPhoto.hoverTarget = 1;
+    dom.style.cursor = p ? 'pointer' : 'grab';
+  }
+}
+
+function openPhotoFull(photo){
+  if(!photo.url) return;
+  lightboxImg.src = photo.url;
+  lightbox.classList.add('on');
+}
+
+/* =========================================================
+   15. 相机更新
+   ========================================================= */
+function updateCamera(dt){
+  const k = Math.min(1, dt*7);
+  cam.theta  = lerp(cam.theta,  cam.tTheta,  k);
+  cam.phi    = lerp(cam.phi,    cam.tPhi,    k);
+  cam.radius = lerp(cam.radius, cam.tRadius, k);
+
+  const sp = Math.sin(cam.phi);
+  const cp = Math.cos(cam.phi);
+  camera.position.set(
+    cam.radius * sp * Math.sin(cam.theta),
+    cam.radius * cp,
+    cam.radius * sp * Math.cos(cam.theta)
+  );
+  camera.lookAt(0, 0, 0);
+}
+
+/* =========================================================
+   16. 渲染循环
+   ========================================================= */
+const clock = new THREE.Clock();
+
+function tick(){
+  requestAnimationFrame(tick);
+
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const time = clock.elapsedTime;
+
+  starUniforms.uTime.value = time;
+
+  updatePhases(dt);
+  updateCamera(dt);
+
+  if(phase === S.SPIN){
+    const e = easeInOutCubic(clamp(phaseT/2.8, 0, 1));
+    heartGroup.rotation.y = e * TAU;
+  }else if(phase === S.GATHER){
+    heartGroup.rotation.y = 0;
+  }
+
+  updatePhotos(dt, time);
+  updateFloatHearts(dt, time);
+  updateCollapseGlow(dt);
+  fireworks.update(dt);
+
+  heartGroup.position.y = Math.sin(time*0.55) * 0.045;
+
+  renderer.render(scene, camera);
+}
+
+/* =========================================================
+   17. UI 事件
+   ========================================================= */
+const fileInput = document.getElementById('fileInput');
+const loadingEl = document.getElementById('loading');
+const hintEl = document.getElementById('hint');
+
+document.getElementById('btnUpload').addEventListener('click', ()=>{
+  fileInput.click();
+});
+
+fileInput.addEventListener('change', async ()=>{
+  const files = [...fileInput.files].filter(f=>f.type.startsWith('image/'));
+  fileInput.value = '';
+  if(!files.length) return;
+
+  loadingEl.classList.add('on');
+  for(const f of files){
+    try{
+      const blob = await fileToBlob(f);
+      await dbAdd(blob);
+    }catch(err){ console.warn('skip file', err); }
+  }
+  await buildPhotos();
+  loadingEl.classList.remove('on');
+  hintEl.classList.add('hide');
+  resetToGather();
+});
+
+document.getElementById('btnClear').addEventListener('click', async ()=>{
+  if(!confirm('清空所有照片？')) return;
+  await dbClear();
+  disposePhotos();
+  fireworks.clear();
+  stopCarousel();
+  filmStrip.innerHTML = '';
+  carouselEl.classList.remove('on');
+  document.getElementById('empty').classList.add('on');
+  collapseGlow.material.opacity = 0;
+  setPhase(S.IDLE);
+  btnCreate.classList.remove('show');
+});
+
+btnCreate.addEventListener('click', ()=>{
+  if(phase !== S.IDLE) return;
+  if(!photos.length) return;
+  btnCreate.classList.remove('show');
+  setPhase(S.COLLAPSE);
+});
+
+/* 音乐 */
+const bgm = document.getElementById('bgm');
+const btnMusic = document.getElementById('btnMusic');
+let musicOn = false;
+let musicStarted = false;
+let fadeTimer = null;
+
+function fadeVolume(target, dur=1200){
+  if(fadeTimer) clearInterval(fadeTimer);
+  const start = bgm.volume;
+  const t0 = performance.now();
+  fadeTimer = setInterval(()=>{
+    const k = clamp((performance.now()-t0)/dur, 0, 1);
+    bgm.volume = clamp(lerp(start, target, k), 0, 1);
+    if(k >= 1){ clearInterval(fadeTimer); fadeTimer = null; }
+  }, 40);
+}
+
+function tryStartMusic(){
+  if(musicStarted) return;
+  musicStarted = true;
+  bgm.volume = 0;
+  const p = bgm.play();
+  if(p && p.then){
+    p.then(()=>{
+      musicOn = true;
+      btnMusic.classList.remove('off');
+      fadeVolume(0.32, 2500);
+    }).catch(()=>{
+      musicStarted = false;
+      btnMusic.classList.add('off');
+    });
+  }
+}
+
+btnMusic.addEventListener('click', (e)=>{
+  e.stopPropagation();
+  if(!musicStarted){
+    tryStartMusic();
+    return;
+  }
+  if(musicOn){
+    fadeVolume(0, 500);
+    setTimeout(()=>{ bgm.pause(); }, 520);
+    musicOn = false;
+    btnMusic.classList.add('off');
+  }else{
+    bgm.play().then(()=>{
+      musicOn = true;
+      btnMusic.classList.remove('off');
+      fadeVolume(0.32, 900);
+    }).catch(()=>{});
+  }
+});
+
+window.addEventListener('pointerdown', function once(){
+  tryStartMusic();
+  window.removeEventListener('pointerdown', once);
+}, { once:true });
+
+/* =========================================================
+   18. 尺寸
+   ========================================================= */
+function onResize(){
+  const w = window.innerWidth, h = window.innerHeight;
+  camera.aspect = w/h;
+  camera.updateProjectionMatrix();
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, DPR_CAP));
+  renderer.setSize(w,h);
+  starUniforms.uPixelRatio.value = renderer.getPixelRatio();
+
+  if(carouselEl.classList.contains('on') && photoURLs.length){
+    computeCell();
+    for(const item of filmStrip.children){
+      item.style.width  = cellW + 'px';
+      item.style.height = cellH + 'px';
+      item.style.marginRight = gap + 'px';
+    }
+    updateStripPosition(false);
+  }
+}
+window.addEventListener('resize', onResize);
+window.addEventListener('orientationchange', ()=> setTimeout(onResize, 220));
+
+/* =========================================================
+   19. 启动
+   ========================================================= */
+(async function boot(){
+  await buildPhotos();
+  if(photos.length){
+    hintEl.classList.add('hide');
+    setPhase(S.GATHER);
+  }else{
+    setPhase(S.IDLE);
+    btnCreate.classList.remove('show');
+  }
+  cam.tRadius = fitRadius();
+  cam.radius = fitRadius();
+  tick();
+})();
+
+document.addEventListener('visibilitychange', ()=>{
+  if(document.hidden){
+    clock.stop();
+  }else{
+    clock.start();
+  }
+});
+</script>
+</body>
+</html>
